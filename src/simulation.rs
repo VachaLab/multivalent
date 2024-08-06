@@ -64,8 +64,8 @@ pub struct System {
     pub msd_file: String,
     /// number of warnings raised during the simulation
     pub n_warnings: u32,
-    /// total binding energy of the particle
-    pub binding_energy: f64,
+    /// boltzmann factor of the particle
+    pub boltzmann_factor: f64,
 }
 
 impl System {
@@ -95,7 +95,7 @@ impl System {
             hard_spheres: false,
             msd_file: "msd{{BLOCK_NUMBER}}.dat".to_string(),
             n_warnings: 0,
-            binding_energy: 0.0,
+            boltzmann_factor: 0.0,
         }
     }
 
@@ -185,7 +185,7 @@ impl System {
                 }
 
                 if sweep > self.eq_sweeps {
-                    self.binding_energy += self.energy_full_surface();
+                    self.boltzmann_factor += (-self.energy_full_surface()).exp();
                     for particle in self.particles.iter_mut() {
                         if particle.binding != 0.0 {
                             particle.well_analyze(self.dimensionality);
@@ -497,11 +497,11 @@ impl System {
         self.statistics.report();
     }
 
-    /// Prints average binding energy of the particle.
+    /// Prints free energy of the particle.
     pub fn print_energy(&self) {
         println!(
-            "\nAverage binding energy: {}",
-            self.binding_energy / (self.repeats * self.prod_sweeps) as f64
+            "\nFree energy: {}",
+            -(self.boltzmann_factor / (self.repeats * self.prod_sweeps) as f64).ln()
         );
     }
 
