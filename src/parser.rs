@@ -1,25 +1,26 @@
 // Released under MIT License.
 // Copyright (c) 2023 Ladislav Bartos
 
-use crate::particle::Particle;
 use crate::bond::Bond;
-use crate::simulation::{System, Dimensionality};
-use std::io::{BufRead, BufReader};
+use crate::particle::Particle;
+use crate::simulation::{Dimensionality, System};
 use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 enum ParseBlock {
     None,
     System,
     Particles,
-    Bonds
+    Bonds,
 }
 
 /// Parses an input line that corresponds to system parameters.
 fn parse_system_line(line: &str, system: &mut System) -> bool {
-
     let split: Vec<&str> = line.split_whitespace().collect();
 
-    if split.len() != 2 { return false };
+    if split.len() != 2 {
+        return false;
+    };
 
     match split[0] {
         "repeats" => match split[1].parse::<u32>() {
@@ -69,23 +70,23 @@ fn parse_system_line(line: &str, system: &mut System) -> bool {
             "no" => system.hard_spheres = false,
             "yes" => system.hard_spheres = true,
             _ => return false,
-        }
+        },
 
         "msd_file" => system.msd_file = split[1].to_string(),
 
-        _ => return false
+        _ => return false,
     }
 
     true
-
 }
 
 /// Parses an input line that corresponds to a particle. Note that the particle number is actually ignored.
 fn parse_particle_line(line: &str) -> Result<Particle, ()> {
-
     let split: Vec<&str> = line.split_whitespace().collect();
 
-    if split.len() != 9 { return Err(()); }
+    if split.len() != 9 {
+        return Err(());
+    }
 
     let mut values = [0.0f64; 8];
 
@@ -96,15 +97,24 @@ fn parse_particle_line(line: &str) -> Result<Particle, ()> {
         };
     }
 
-    Ok(Particle::new([values[0], values[1]], values[2], values[3], values[4], values[5], values[6], values[7]))
+    Ok(Particle::new(
+        [values[0], values[1]],
+        values[2],
+        values[3],
+        values[4],
+        values[5],
+        values[6],
+        values[7],
+    ))
 }
 
 /// Parses an input line that corresponds to a bond.
 fn parse_bond_line(line: &str) -> Result<Bond, ()> {
-
     let split: Vec<&str> = line.split_whitespace().collect();
 
-    if split.len() != 4 { return Err(()); }
+    if split.len() != 4 {
+        return Err(());
+    }
 
     let p1 = match split[0].parse::<usize>() {
         Ok(x) => x,
@@ -127,18 +137,16 @@ fn parse_bond_line(line: &str) -> Result<Bond, ()> {
     };
 
     Ok(Bond::new([p1, p2], fc, eq))
-
 }
 
 /// Parses input file.
 pub fn parse_input(filename: &str) -> Result<System, ()> {
-    
     let file = match File::open(filename) {
         Ok(x) => x,
         Err(_) => {
             eprintln!("\nError. Input file `{}` could not be read.", filename);
             return Err(());
-        },
+        }
     };
 
     let reader = BufReader::new(file);
@@ -157,29 +165,32 @@ pub fn parse_input(filename: &str) -> Result<System, ()> {
         };
 
         if line.trim() == "" || line.trim().chars().next().unwrap() == '#' {
-            continue
+            continue;
         }
 
-        if line.contains("[system]") { 
+        if line.contains("[system]") {
             block = ParseBlock::System;
             continue;
         }
 
-        if line.contains("[particles]") { 
+        if line.contains("[particles]") {
             block = ParseBlock::Particles;
             continue;
         }
 
-        if line.contains("[bonds]") { 
+        if line.contains("[bonds]") {
             block = ParseBlock::Bonds;
             continue;
         }
 
         match block {
             ParseBlock::None => {
-                eprintln!("\nError. Could not understand line `{}` in `{}`.", line, filename);
+                eprintln!(
+                    "\nError. Could not understand line `{}` in `{}`.",
+                    line, filename
+                );
                 return Err(());
-            },
+            }
             ParseBlock::Particles => {
                 let particle = match parse_particle_line(&line) {
                     Ok(x) => x,
@@ -190,7 +201,7 @@ pub fn parse_input(filename: &str) -> Result<System, ()> {
                 };
 
                 system.add_particle(particle);
-            },
+            }
             ParseBlock::Bonds => {
                 let bond = match parse_bond_line(&line) {
                     Ok(x) => x,
@@ -201,16 +212,18 @@ pub fn parse_input(filename: &str) -> Result<System, ()> {
                 };
 
                 system.add_bond(bond);
-            },
+            }
             ParseBlock::System => {
                 if !parse_system_line(&line, &mut system) {
-                    eprintln!("\nError. Could not parse line `{}` as system information.", line);
+                    eprintln!(
+                        "\nError. Could not parse line `{}` as system information.",
+                        line
+                    );
                     return Err(());
                 }
             }
-
         }
     }
-    
+
     Ok(system)
-}    
+}

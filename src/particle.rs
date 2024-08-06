@@ -1,17 +1,19 @@
 // Released under MIT License.
 // Copyright (c) 2023 Ladislav Bartos
 
+use core::f64::consts::PI;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use std::fmt;
-use core::f64::consts::PI;
+
+use crate::simulation::Dimensionality;
 
 /// Particle is a hard sphere or a point in space that can:
-/// 
+///
 /// a) interact with the surface,
-/// 
+///
 /// b) bond with other particles,
-/// 
+///
 /// c) repulse other particles.
 #[derive(Clone)]
 pub struct Particle {
@@ -30,27 +32,51 @@ pub struct Particle {
     sin_shift: f64,
     /// shift of the cosine term of the surface potential
     cos_shift: f64,
+    /// current closest well
+    pub closest_well: [f64; 2],
+    /// residence time
+    pub residence_time: Vec<usize>,
 }
 
 impl Particle {
-
     /// Creates a new particle.
-    pub fn new(position: [f64; 2], binding: f64, max_disp: f64, size: f64, wells_distance: f64, sin_shift: f64, cos_shift: f64) -> Particle {
-        Particle { position, binding, max_disp, size, wells_distance, sin_shift, cos_shift }
+    pub fn new(
+        position: [f64; 2],
+        binding: f64,
+        max_disp: f64,
+        size: f64,
+        wells_distance: f64,
+        sin_shift: f64,
+        cos_shift: f64,
+    ) -> Particle {
+        let mut particle = Particle {
+            position,
+            binding,
+            max_disp,
+            size,
+            wells_distance,
+            sin_shift,
+            cos_shift,
+            closest_well: [0.0, 0.0],
+            residence_time: vec![0],
+        };
+
+        particle.closest_well = particle.get_closest_well();
+        particle
     }
 
     /// Calculates energy of particle-surface interaction.
     pub fn energy_surface(&self) -> f64 {
-        self.binding * (1.0 + 
-            (2.0 * PI * (self.position[0] / self.wells_distance + self.sin_shift)).sin() + 
-            (2.0 * PI * (self.position[1] / self.wells_distance + self.cos_shift)).cos()
-        )
+        self.binding
+            * (1.0
+                + (2.0 * PI * (self.position[0] / self.wells_distance + self.sin_shift)).sin()
+                + (2.0 * PI * (self.position[1] / self.wells_distance + self.cos_shift)).cos())
     }
 
     /// Proposes a translation move for a particle in 2D space.
-    /// 
+    ///
     /// ## Details
-    /// MODIFIES THE COORDINATES OF THE PARTICLE. 
+    /// MODIFIES THE COORDINATES OF THE PARTICLE.
     /// If the move is subsequently rejected, particle must be returned to the original position.
     pub fn propose_move_2d(&mut self, rng: &mut ThreadRng) {
         // get random displacement smaller than max_disp (maximal displacement)
@@ -68,12 +94,42 @@ impl Particle {
         // get random displacement in one dimension that is smaller than max_disp
         let mut dx = self.max_disp * rng.gen::<f64>();
         if rng.gen::<bool>() {
-            dx *= -1.0;   
+            dx *= -1.0;
         }
 
         self.position[0] += dx;
     }
 
+    pub fn get_closest_well(&self) -> [f64; 2] {
+        // assuming 1D and -0.25 shift in sin
+        [
+            (((self.position[0] / self.wells_distance).round() * self.wells_distance) * 1000.0)
+                .round()
+                / 1000.0,
+            0.0,
+        ]
+    }
+
+    pub fn well_analyze(&mut self, dim: Dimensionality) {
+        match dim {
+            Dimensionality::ONE => {
+                // assuming -0.25 shift in sin
+                let closest_well = self.get_closest_well();
+
+                if self.closest_well[0] == closest_well[0] {
+                    *self.residence_time.last_mut().unwrap() += 1;
+                } else {
+                    self.residence_time.push(0);
+                    self.closest_well = closest_well;
+                }
+            }
+            Dimensionality::TWO => panic!("Closest well is not implemented for 2D."),
+        }
+    }
+
+    pub fn average_residence_time(&self) -> f64 {
+        self.residence_time.iter().sum::<usize>() as f64 / self.residence_time.len() as f64
+    }
 }
 
 /// Allows the usage of print* macros for Particle.
@@ -83,8 +139,6 @@ impl fmt::Display for Particle {
                    self.position[0], self.position[1], self.binding, self.max_disp, self.size, self.wells_distance, self.sin_shift, self.cos_shift)
     }
 }
-
-
 
 /*
 *************************************
@@ -102,7 +156,6 @@ mod tests {
 
     #[test]
     fn test_particle_surface_energy() {
-
         let system = parse_input(INPUT_FILE).expect("Could not find input file.");
         let expected = [-1.0, 3.0, -0.0, 0.25, 0.08244];
         for (i, particle) in system.particles.iter().enumerate() {
@@ -112,7 +165,6 @@ mod tests {
 
     #[test]
     fn test_particle_propose_move_1d() {
-
         let mut rng = rand::thread_rng();
         let n_moves = 10_000usize;
 
@@ -125,9 +177,9 @@ mod tests {
 
             for _ in 0..n_moves {
                 let old_pos_x = particle.position[0];
-    
+
                 particle.propose_move_1d(&mut rng);
-    
+
                 assert!((particle.position[0] - old_pos_x).abs() < particle.max_disp);
                 assert_eq!(particle.position[1], 0.0);
             }
@@ -140,14 +192,23 @@ mod tests {
 
     #[test]
     fn test_particle_propose_move_2d() {
-
         let mut rng = rand::thread_rng();
         let n_moves = 10_000usize;
 
         let displacements = [0.1, 0.5, 1.0];
 
         for i in 0..3 {
-            let mut particle = Particle { position: [0.0, 0.0], binding: 0.0, max_disp: displacements[i], size: 0.0, wells_distance: 1.0, sin_shift: 0.0, cos_shift: 0.0 };
+            let mut particle = Particle {
+                position: [0.0, 0.0],
+                binding: 0.0,
+                max_disp: displacements[i],
+                size: 0.0,
+                wells_distance: 1.0,
+                sin_shift: 0.0,
+                cos_shift: 0.0,
+                closest_well: [0.0, 0.0],
+                residence_time: Vec::new(),
+            };
 
             let orig_pos_x = particle.position[0];
             let orig_pos_y = particle.position[1];
@@ -155,7 +216,7 @@ mod tests {
             for _ in 0..n_moves {
                 let old_pos_x = particle.position[0];
                 let old_pos_y = particle.position[1];
-    
+
                 particle.propose_move_2d(&mut rng);
 
                 let dx = particle.position[0] - old_pos_x;
@@ -168,8 +229,6 @@ mod tests {
             // these two may in very rare cases fail
             assert!((particle.position[0] - orig_pos_x).abs() < particle.max_disp * 200.0);
             assert!((particle.position[1] - orig_pos_y).abs() < particle.max_disp * 200.0);
-            
         }
     }
-    
 }
