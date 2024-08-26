@@ -5,8 +5,6 @@ use core::f64::consts::PI;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use std::fmt;
-use std::fs::File;
-use std::io::{BufWriter, Write};
 
 /// Particle is a hard sphere or a point in space that can:
 ///
@@ -32,8 +30,6 @@ pub struct Particle {
     sin_shift: f64,
     /// shift of the cosine term of the surface potential
     cos_shift: f64,
-    /// positions of the particle along the virtual z-axis calculated for each sweep
-    positions: Vec<f64>,
 }
 
 impl Particle {
@@ -55,7 +51,6 @@ impl Particle {
             wells_distance,
             sin_shift,
             cos_shift,
-            positions: Vec::new(),
         }
     }
 
@@ -75,23 +70,9 @@ impl Particle {
             + (2.0 * PI * (self.position[1] / self.wells_distance + self.cos_shift)).cos())
     }
 
-    /// Calculate the position of the particle along the virtual z-axis and store it.
-    pub fn position(&mut self) -> f64 {
-        let position = self.fake_energy_surface();
-        self.positions.push(position);
-
-        position
-    }
-
-    pub fn write_positions(&self, output_file: &str) {
-        let file = File::create(output_file).unwrap();
-        let mut writer = BufWriter::new(file);
-
-        writeln!(writer, "$ type histogram").unwrap();
-        writeln!(writer, "$ bins 50").unwrap();
-        for position in self.positions.iter() {
-            writeln!(writer, "{}", position).unwrap();
-        }
+    /// Calculate the position of the particle along the virtual z-axis.
+    pub fn position(&self) -> f64 {
+        self.fake_energy_surface()
     }
 
     /// Proposes a translation move for a particle in 2D space.
@@ -196,7 +177,6 @@ mod tests {
                 wells_distance: 1.0,
                 sin_shift: 0.0,
                 cos_shift: 0.0,
-                positions: Vec::new(),
             };
 
             let orig_pos_x = particle.position[0];

@@ -64,8 +64,10 @@ pub struct System {
     pub msd_file: String,
     /// number of warnings raised during the simulation
     pub n_warnings: u32,
-    /// positions of the COM of a particle along a virtual z-axis calculated for each sweep
+    /// positions of the COM of the particles along a virtual z-axis calculated for each sweep
     pub positions: Vec<f64>,
+    /// positions of the individual particles
+    pub positions_particles: Vec<Vec<f64>>,
 }
 
 impl System {
@@ -96,6 +98,7 @@ impl System {
             msd_file: "msd{{BLOCK_NUMBER}}.dat".to_string(),
             n_warnings: 0,
             positions: Vec::new(),
+            positions_particles: Vec::new(),
         }
     }
 
@@ -104,6 +107,7 @@ impl System {
         self.particles.push(particle);
         self.statistics.accepted.push(0);
         self.statistics.rejected.push(0);
+        self.positions_particles.push(Vec::new());
     }
 
     /// Adds bonds to the bond list.
@@ -174,8 +178,10 @@ impl System {
                 // store "z-position" for each ligand and for the particle as a whole
                 if sweep > self.prod_sweeps {
                     let mut total_position = 0.0;
-                    for particle in self.particles.iter_mut() {
-                        total_position += particle.position();
+                    for (p, particle) in self.particles.iter_mut().enumerate() {
+                        let position = particle.position();
+                        self.positions_particles[p].push(position);
+                        total_position += position;
                     }
                     self.positions
                         .push(total_position / self.particles.len() as f64);
@@ -268,23 +274,31 @@ impl System {
         }
 
         // writing positions
-        self.write_positions("positions_average.dat");
-        for (i, particle) in self.particles.iter().enumerate() {
-            let filename = format!("positions_particle_{}.dat", i);
-            particle.write_positions(&filename);
-        }
+        self.write_positions();
 
         true
     }
 
-    pub fn write_positions(&self, output_file: &str) {
-        let file = File::create(output_file).unwrap();
+    pub fn write_positions(&self) {
+        let file = File::create("positions_average.dat").unwrap();
         let mut writer = BufWriter::new(file);
 
         writeln!(writer, "$ type histogram").unwrap();
         writeln!(writer, "$ bins 50").unwrap();
         for position in self.positions.iter() {
             writeln!(writer, "{}", position).unwrap();
+        }
+
+        for (i, _) in self.particles.iter().enumerate() {
+            let filename: String = format!("positions_particle_{}.dat", i);
+            let file = File::create(&filename).unwrap();
+            let mut writer = BufWriter::new(file);
+
+            writeln!(writer, "$ type histogram").unwrap();
+            writeln!(writer, "$ bins 50").unwrap();
+            for position in self.positions_particles[i].iter() {
+                writeln!(writer, "{}", position).unwrap();
+            }
         }
     }
 
