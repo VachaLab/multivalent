@@ -67,9 +67,17 @@ impl Particle {
                 + (2.0 * PI * (self.position[1] / self.wells_distance + self.cos_shift)).cos())
     }
 
+    /// Calculates energy of particle-surface interaction as if the binding affinity of the particle were 1.0.
+    /// Used inside `position`.
+    fn fake_energy_surface(&self) -> f64 {
+        1.0 * (1.0
+            + (2.0 * PI * (self.position[0] / self.wells_distance + self.sin_shift)).sin()
+            + (2.0 * PI * (self.position[1] / self.wells_distance + self.cos_shift)).cos())
+    }
+
     /// Calculate the position of the particle along the virtual z-axis and store it.
     pub fn position(&mut self) -> f64 {
-        let position = self.energy_surface();
+        let position = self.fake_energy_surface();
         self.positions.push(position);
 
         position
@@ -80,6 +88,7 @@ impl Particle {
         let mut writer = BufWriter::new(file);
 
         writeln!(writer, "$ type histogram").unwrap();
+        writeln!(writer, "$ bins -1.0 -0.9 -0.8 -0.7 -0.6 -0.5 -0.4 -0.3 -0.2 -0.1 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0").unwrap();
         for position in self.positions.iter() {
             writeln!(writer, "{}", position).unwrap();
         }
