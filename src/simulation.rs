@@ -282,7 +282,7 @@ impl System {
         let mut writer = BufWriter::new(file);
 
         writeln!(writer, "$ type histogram").unwrap();
-        writeln!(writer, "$ bins -1.0 -0.9 -0.8 -0.7 -0.6 -0.5 -0.4 -0.3 -0.2 -0.1 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0").unwrap();
+        writeln!(writer, "$ bins 50").unwrap();
         for position in self.positions.iter() {
             writeln!(writer, "{}", position).unwrap();
         }
