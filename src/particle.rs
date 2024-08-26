@@ -5,6 +5,8 @@ use core::f64::consts::PI;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use std::fmt;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 
 /// Particle is a hard sphere or a point in space that can:
 ///
@@ -71,6 +73,16 @@ impl Particle {
         self.positions.push(position);
 
         position
+    }
+
+    pub fn write_positions(&self, output_file: &str) {
+        let file = File::create(output_file).unwrap();
+        let mut writer = BufWriter::new(file);
+
+        writeln!(writer, "$ type histogram").unwrap();
+        for position in self.positions.iter() {
+            writeln!(writer, "{}", position).unwrap();
+        }
     }
 
     /// Proposes a translation move for a particle in 2D space.

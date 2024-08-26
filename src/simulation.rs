@@ -6,7 +6,7 @@ use rand::Rng;
 
 use std::fmt;
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use std::time::Instant;
 
 use crate::bond::Bond;
@@ -267,7 +267,24 @@ impl System {
             println!("\nDiffusion calculation not requested.");
         }
 
+        // writing positions
+        self.write_positions("positions_average.dat");
+        for (i, particle) in self.particles.iter().enumerate() {
+            let filename = format!("positions_particle_{}", i);
+            particle.write_positions(&filename);
+        }
+
         true
+    }
+
+    pub fn write_positions(&self, output_file: &str) {
+        let file = File::create(output_file).unwrap();
+        let mut writer = BufWriter::new(file);
+
+        writeln!(writer, "$ type histogram").unwrap();
+        for position in self.positions.iter() {
+            writeln!(writer, "{}", position).unwrap();
+        }
     }
 
     /// Performs one simulation sweep.
