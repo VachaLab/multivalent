@@ -176,7 +176,7 @@ impl System {
                 self.try_writing_movie(&mut movie, sweep, repeat);
 
                 // store "z-position" for each ligand and for the particle as a whole
-                if sweep > self.prod_sweeps && sweep % self.msd_freq == 0 {
+                if sweep > self.eq_sweeps && sweep % self.msd_freq == 0 {
                     let mut total_position = 0.0;
                     for (p, particle) in self.particles.iter_mut().enumerate() {
                         let position = particle.position();
